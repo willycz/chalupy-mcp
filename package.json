@@ -1,7 +1,7 @@
 {
   "name": "chalupy-mcp",
   "version": "1.0.0",
-  "description": "MCP server pro vyhledávání chalup na e-chalupy.cz",
+  "description": "MCP server pro vyhledávání pronájmů chalup na e-chalupy.cz",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,7 @@
     "dist",
     "README.md"
   ],
-  "keywords": ["mcp", "chalupy", "search"],
+  "keywords": ["mcp", "chalupy", "search", "pronájem", "rental"],
   "author": "",
   "license": "MIT",
   "dependencies": {

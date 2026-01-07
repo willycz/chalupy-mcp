@@ -25,13 +25,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "search_chalupy",
-        description: "Vyhledá chalupy na e-chalupy.cz podle zadaných kritérií",
+        description: "Vyhledá pronájmy chalup a chat na e-chalupy.cz podle zadaných kritérií",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Vyhledávací dotaz (např. 'chalupa jihomoravský kraj', 'rekreační objekt orlické hory')",
+              description: "Vyhledávací dotaz (např. 'chata s bazénem', 'víkendový pobyt v Krkonoších')",
             },
             region: {
               type: "string",
@@ -39,11 +39,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             priceMin: {
               type: "number",
-              description: "Minimální cena v Kč",
+              description: "Minimální cena pronájmu v Kč",
             },
             priceMax: {
               type: "number",
-              description: "Maximální cena v Kč",
+              description: "Maximální cena pronájmu v Kč",
             },
             maxResults: {
               type: "number",
@@ -55,13 +55,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "get_property_details",
-        description: "Získá detailní informace o konkrétní chalupě podle URL",
+        description: "Získá detailní informace o konkrétním objektu k pronájmu podle URL",
         inputSchema: {
           type: "object",
           properties: {
             url: {
               type: "string",
-              description: "URL adresa chalupy na e-chalupy.cz",
+              description: "URL adresa objektu na e-chalupy.cz",
             },
           },
           required: ["url"],

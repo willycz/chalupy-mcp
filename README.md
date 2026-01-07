@@ -1,11 +1,11 @@
 # E-Chalupy MCP Server
 
-MCP server pro vyhledávání chalup a rekreačních objektů na webu e-chalupy.cz.
+MCP server pro vyhledávání pronájmů chalup a chat na e-chalupy.cz (pronájem rekreačních objektů na týdny, víkendy).
 
 ## 🚀 Funkce
 
-- **search_chalupy** - Vyhledávání chalup podle kritérií (kraj, cena, klíčová slova)
-- **get_property_details** - Získání detailních informací o konkrétní chalupě
+- **search_chalupy** - Vyhledávání pronájmů chalup podle kritérií (kraj, cena, klíčová slova)
+- **get_property_details** - Získání detailních informací o konkrétním objektu
 
 ## 📦 Instalace
 
@@ -103,24 +103,24 @@ Po přidání konfigurace restartujte aplikaci Claude Desktop, aby se server na�
 
 ### Příklady dotazů v Claude Desktop
 
-**Vyhledávání chalup:**
+**Vyhledávání pronájmů:**
 ```
-Vyhledej chalupy v Jihomoravském kraji do 3 milionů Kč
+Vyhledej chalupy k pronájmu v Jihomoravském kraji do 10 000 Kč za týden
 ```
 
 **Vyhledávání s klíčovými slovy:**
 ```
-Najdi chalupu s bazénem v Orlických horách
+Najdi chatu s bazénem v Orlických horách
 ```
 
-**Detail nemovitosti:**
+**Detail objektu:**
 ```
-Zobraz mi detaily chalupy z URL: https://www.e-chalupy.cz/inzerat/12345
+Zobraz mi detaily této chalupy: https://www.e-chalupy.cz/inzerat/12345
 ```
 
 **Pokročilé vyhledávání:**
 ```
-Vyhledej rekreační objekty v ceně 2-4 miliony Kč v Královéhradeckém kraji
+Vyhledej rekreační objekty na víkend v ceně 5-8 tisíc Kč v Krkonoších
 ```
 
 ## 🛠️ Dostupné nástroje
@@ -128,16 +128,16 @@ Vyhledej rekreační objekty v ceně 2-4 miliony Kč v Královéhradeckém kraji
 ### `search_chalupy`
 
 Parametry:
-- `query` (string, optional) - Vyhledávací dotaz
+- `query` (string, optional) - Vyhledávací dotaz (např. "chata s bazénem", "víkendový pobyt")
 - `region` (string, optional) - Název kraje
-- `priceMin` (number, optional) - Minimální cena v Kč
-- `priceMax` (number, optional) - Maximální cena v Kč
+- `priceMin` (number, optional) - Minimální cena pronájmu v Kč
+- `priceMax` (number, optional) - Maximální cena pronájmu v Kč
 - `maxResults` (number, optional) - Max. počet výsledků (výchozí: 10)
 
 ### `get_property_details`
 
 Parametry:
-- `url` (string, required) - URL adresa nemovitosti na e-chalupy.cz
+- `url` (string, required) - URL adresa objektu na e-chalupy.cz
 
 ## 📝 Vývoj
 
