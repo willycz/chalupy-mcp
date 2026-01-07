@@ -70,6 +70,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "Datum do (YYYY-MM-DD)",
             },
+            priceMin: {
+              type: "number",
+              description: "Minimální cena v Kč",
+            },
+            priceMax: {
+              type: "number",
+              description: "Maximální cena v Kč",
+            },
             maxResults: {
               type: "number",
               description: "Maximální počet výsledků (výchozí 10)",
@@ -132,6 +140,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         persons: args.persons as number,
         dateFrom: args.dateFrom as string,
         dateTo: args.dateTo as string,
+        priceMin: args.priceMin as number,
+        priceMax: args.priceMax as number,
         maxResults: (args.maxResults as number) || 10,
       });
 

@@ -8,6 +8,8 @@ export interface SearchParams {
   persons?: number;
   dateFrom?: string;
   dateTo?: string;
+  priceMin?: number;
+  priceMax?: number;
   maxResults?: number;
 }
 
@@ -166,6 +168,12 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
   }
   if (params.dateTo) {
     queryParams.push(`do=${params.dateTo}`);
+  }
+  if (params.priceMin) {
+    queryParams.push(`cenaMin=${params.priceMin}`);
+  }
+  if (params.priceMax) {
+    queryParams.push(`cenaMax=${params.priceMax}`);
   }
 
   if (queryParams.length > 0) {
