@@ -110,41 +110,108 @@ Po přidání konfigurace restartujte aplikaci Claude Desktop, aby se server na�
 
 ### Příklady dotazů v Claude Desktop
 
-**Vyhledávání pronájmů:**
+**Seznam regionů:**
 ```
-Vyhledej chalupy k pronájmu v Jihomoravském kraji do 10 000 Kč za týden
+Jaké regiony jsou dostupné pro vyhledávání chalup?
 ```
 
-**Vyhledávání s klíčovými slovy:**
+**Vyhledávání s filtry:**
 ```
-Najdi chatu s bazénem v Orlických horách
+Vyhledej chalupy na Vysočině s bazénem pro 10 osob
+```
+
+**Vyhledávání s termínem:**
+```
+Najdi chalupu v Krkonoších pro 8 osob od 15.7. do 22.7.2026
+```
+
+**Kombinace filtrů:**
+```
+Chci chalupu v Jeseníkách se saunou a vířivkou pro 12 lidí
 ```
 
 **Detail objektu:**
 ```
-Zobraz mi detaily této chalupy: https://www.e-chalupy.cz/inzerat/12345
-```
-
-**Pokročilé vyhledávání:**
-```
-Vyhledej rekreační objekty na víkend v ceně 5-8 tisíc Kč v Krkonoších
+Zobraz mi detaily této chalupy: https://www.e-chalupy.cz/pronajem-chalupa-milana-velke-losiny-ubytovani-o11240
 ```
 
 ## 🛠️ Dostupné nástroje
 
+### `list_regions`
+
+Vrátí seznam všech českých regionů pro vyhledávání.
+
+**Výstup:**
+```json
+[
+  { "slug": "vysocina", "name": "Vysočina", "count": 1434 },
+  { "slug": "krkonose", "name": "Krkonoše", "count": 1445 },
+  ...
+]
+```
+
+### `list_features`
+
+Vrátí seznam všech dostupných vlastností a vybavení pro filtrování.
+
+**Výstup:**
+```json
+[
+  { "slug": "bazen-venkovni", "name": "Bazén - venkovní", "count": 3338 },
+  { "slug": "se-saunou", "name": "Sauna", "count": 3033 },
+  ...
+]
+```
+
 ### `search_chalupy`
 
 Parametry:
-- `query` (string, optional) - Vyhledávací dotaz (např. "chata s bazénem", "víkendový pobyt")
-- `region` (string, optional) - Název kraje
-- `priceMin` (number, optional) - Minimální cena pronájmu v Kč
-- `priceMax` (number, optional) - Maximální cena pronájmu v Kč
+- `query` (string, optional) - Textové vyhledávání v názvech a popisech
+- `region` (string, optional) - Slug regionu (např. "vysocina", "krkonose")
+- `features` (array, optional) - Pole slugů vlastností (např. ["bazen-venkovni", "se-saunou"])
+- `persons` (number, optional) - Minimální počet osob (kapacita objektu)
+- `dateFrom` (string, optional) - Datum od (YYYY-MM-DD)
+- `dateTo` (string, optional) - Datum do (YYYY-MM-DD)
 - `maxResults` (number, optional) - Max. počet výsledků (výchozí: 10)
+
+**Příklad výstupu:**
+```json
+[
+  {
+    "title": "Chalupa Milana",
+    "price": "od 3 572 Kč objekt za noc",
+    "location": "Velké Losiny - Jeseníky",
+    "description": "Kompletně zrekonstruovaná chalupa...",
+    "url": "https://www.e-chalupy.cz/...",
+    "imageUrl": "https://www.e-chalupy.cz/foto/...",
+    "rating": "4.7"
+  }
+]
+```
 
 ### `get_property_details`
 
 Parametry:
 - `url` (string, required) - URL adresa objektu na e-chalupy.cz
+
+**Příklad výstupu:**
+```json
+{
+  "title": "Chalupa Milana (11240)",
+  "price": "od 3 572 Kč objekt za noc",
+  "location": "Velké Losiny, Olomoucký kraj",
+  "capacity": 14,
+  "bedrooms": 4,
+  "rating": "4.8",
+  "tags": ["chalupa 14 osob", "4 ložnice", "sauna", "krb"],
+  "equipment": {
+    "Obecně": ["wifi, internet", "nekuřácký objekt"],
+    "Wellness": ["sauna nebo infrasauna"],
+    "Lokalita": ["u lesa", "u potoku"]
+  },
+  "fullDescription": "V kuchyni kompletně nové vybavení..."
+}
+```
 
 ## 📝 Vývoj
 

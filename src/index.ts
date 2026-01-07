@@ -6,7 +6,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { searchChalupy, getPropertyDetails } from "./scraper.js";
+import { searchChalupy, getPropertyDetails, listRegions, listFeatures } from "./scraper.js";
 
 const server = new Server(
   {
@@ -24,6 +24,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
+        name: "list_regions",
+        description: "Vrátí seznam všech dostupných regionů pro vyhledávání (např. vysocina, krkonose, sumava)",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "list_features",
+        description: "Vrátí seznam všech dostupných vlastností/vybavení pro filtrování (např. bazen-venkovni, se-saunou, s-virivkou)",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
         name: "search_chalupy",
         description: "Vyhledá pronájmy chalup a chat na e-chalupy.cz podle zadaných kritérií",
         inputSchema: {
@@ -31,19 +47,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             query: {
               type: "string",
-              description: "Vyhledávací dotaz (např. 'chata s bazénem', 'víkendový pobyt v Krkonoších')",
+              description: "Textové vyhledávání v názvech a popisech",
             },
             region: {
               type: "string",
-              description: "Kraj (např. 'jihomoravský', 'královéhradecký')",
+              description: "Slug regionu (např. 'vysocina', 'krkonose', 'sumava'). Použij list_regions pro výpis všech.",
             },
-            priceMin: {
-              type: "number",
-              description: "Minimální cena pronájmu v Kč",
+            features: {
+              type: "array",
+              items: { type: "string" },
+              description: "Pole slugů vlastností (např. ['bazen-venkovni', 'se-saunou']). Použij list_features pro výpis všech.",
             },
-            priceMax: {
+            persons: {
               type: "number",
-              description: "Maximální cena pronájmu v Kč",
+              description: "Počet osob (minimální kapacita objektu)",
+            },
+            dateFrom: {
+              type: "string",
+              description: "Datum od (YYYY-MM-DD)",
+            },
+            dateTo: {
+              type: "string",
+              description: "Datum do (YYYY-MM-DD)",
             },
             maxResults: {
               type: "number",
@@ -55,7 +80,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "get_property_details",
-        description: "Získá detailní informace o konkrétním objektu k pronájmu podle URL",
+        description: "Získá detailní informace o konkrétním objektu k pronájmu včetně kapacity, počtu ložnic a vybavení",
         inputSchema: {
           type: "object",
           properties: {
@@ -79,12 +104,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
-    if (name === "search_chalupy") {
+    if (name === "list_regions") {
+      const regions = await listRegions();
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(regions, null, 2),
+          },
+        ],
+      };
+    } else if (name === "list_features") {
+      const features = await listFeatures();
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(features, null, 2),
+          },
+        ],
+      };
+    } else if (name === "search_chalupy") {
       const results = await searchChalupy({
         query: args.query as string,
         region: args.region as string,
-        priceMin: args.priceMin as number,
-        priceMax: args.priceMax as number,
+        features: args.features as string[],
+        persons: args.persons as number,
+        dateFrom: args.dateFrom as string,
+        dateTo: args.dateTo as string,
         maxResults: (args.maxResults as number) || 10,
       });
 

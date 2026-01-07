@@ -4,8 +4,10 @@ import * as cheerio from "cheerio";
 export interface SearchParams {
   query?: string;
   region?: string;
-  priceMin?: number;
-  priceMax?: number;
+  features?: string[];
+  persons?: number;
+  dateFrom?: string;
+  dateTo?: string;
   maxResults?: number;
 }
 
@@ -16,29 +18,154 @@ export interface PropertyListing {
   description: string;
   url: string;
   imageUrl?: string;
-  area?: string;
+  rating?: string;
 }
 
 export interface PropertyDetails extends PropertyListing {
   fullDescription: string;
   features: string[];
-  contact?: string;
-  specifications?: Record<string, string>;
+  capacity?: number;
+  bedrooms?: number;
+  tags: string[];
+  equipment: Record<string, string[]>;
+}
+
+export interface Region {
+  slug: string;
+  name: string;
+  count: number;
+}
+
+export interface Feature {
+  slug: string;
+  name: string;
+  count: number;
+}
+
+const REGIONS_CACHE: Region[] = [];
+const FEATURES_CACHE: Feature[] = [];
+
+export async function listRegions(): Promise<Region[]> {
+  if (REGIONS_CACHE.length > 0) {
+    return REGIONS_CACHE;
+  }
+
+  try {
+    const response = await fetch("https://www.e-chalupy.cz/chaty-chalupy", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    const czechRegions = [
+      "beskydy", "ceske-stredohori", "ceske-svycarsko", "cesky-raj", "jeseniky",
+      "jizerske-hory", "jizni-cechy", "jizni-morava", "kokorinsko", "krkonose",
+      "krusne-hory", "luzicke-hory", "okoli-prahy", "orlicke-hory",
+      "severni-morava-a-slezsko", "stredni-cechy", "sumava", "vychodni-cechy",
+      "vysocina", "zapadni-cechy"
+    ];
+
+    $('a[href^="/"]').each((_, el) => {
+      const href = $(el).attr("href");
+      const name = $(el).find(".t").text().trim();
+      const countText = $(el).find(".c").text().trim();
+      const count = parseInt(countText) || 0;
+
+      if (href && name && count > 0 && czechRegions.includes(href.substring(1))) {
+        const slug = href.substring(1);
+        if (!REGIONS_CACHE.find(r => r.slug === slug)) {
+          REGIONS_CACHE.push({ slug, name, count });
+        }
+      }
+    });
+
+    return REGIONS_CACHE;
+  } catch (error) {
+    throw new Error(`Chyba při načítání regionů: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export async function listFeatures(): Promise<Feature[]> {
+  if (FEATURES_CACHE.length > 0) {
+    return FEATURES_CACHE;
+  }
+
+  try {
+    const response = await fetch("https://www.e-chalupy.cz/chaty-chalupy", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    const featureSlugs = [
+      "bazen-venkovni", "bazen-vnitrni", "se-saunou", "s-virivkou", "s-krbem",
+      "krb-venkovni", "s-koupacim-sudem", "s-koupacim-jezirkem", "detska-postylka",
+      "ohniste", "terasa", "internet", "spolecenska-mistnost", "pro-rodiny-s-detmi",
+      "oploceny-pozemek", "na-samote", "zahrada", "u-lesa", "se-psem", "u-vody",
+      "pro-rybare", "nekuracky", "bezbarierovy", "pro-cyklisty", "u-sjezdovky"
+    ];
+
+    $('a[href^="/"]').each((_, el) => {
+      const href = $(el).attr("href");
+      const name = $(el).find(".t").text().trim();
+      const countText = $(el).find(".c").text().trim();
+      const count = parseInt(countText) || 0;
+
+      if (href && name && count > 0 && featureSlugs.includes(href.substring(1))) {
+        const slug = href.substring(1);
+        if (!FEATURES_CACHE.find(f => f.slug === slug)) {
+          FEATURES_CACHE.push({ slug, name, count });
+        }
+      }
+    });
+
+    return FEATURES_CACHE;
+  } catch (error) {
+    throw new Error(`Chyba při načítání vlastností: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export async function searchChalupy(params: SearchParams): Promise<PropertyListing[]> {
   const baseUrl = "https://www.e-chalupy.cz";
-  let searchUrl = `${baseUrl}/chaty-chalupy`;
-
-  const queryParams: string[] = [];
+  
+  // Build URL path
+  let searchPath = "/chaty-chalupy";
+  
   if (params.region) {
-    queryParams.push(`kraj=${encodeURIComponent(params.region)}`);
+    searchPath = `/${params.region}`;
+    if (params.features && params.features.length > 0) {
+      searchPath += `/${params.features[0]}`;
+    }
+  } else if (params.features && params.features.length > 0) {
+    searchPath = `/${params.features[0]}`;
   }
-  if (params.priceMin) {
-    queryParams.push(`cena_od=${params.priceMin}`);
+
+  let searchUrl = `${baseUrl}${searchPath}`;
+
+  // Build query parameters
+  const queryParams: string[] = [];
+  if (params.persons) {
+    queryParams.push(`osoby=${params.persons}`);
   }
-  if (params.priceMax) {
-    queryParams.push(`cena_do=${params.priceMax}`);
+  if (params.dateFrom) {
+    queryParams.push(`od=${params.dateFrom}`);
+  }
+  if (params.dateTo) {
+    queryParams.push(`do=${params.dateTo}`);
   }
 
   if (queryParams.length > 0) {
@@ -73,6 +200,7 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
       const description = $el.find(".desc").first().text().trim();
       const link = $el.find("a.images-link").first().attr("href");
       const imageUrl = $el.find("img").first().attr("src");
+      const rating = $el.find(".simple-rating").first().text().trim();
 
       if (title && link) {
         listings.push({
@@ -82,6 +210,7 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
           description: description || "",
           url: link.startsWith("http") ? link : `${baseUrl}${link}`,
           imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `${baseUrl}${imageUrl}`) : undefined,
+          rating: rating || undefined,
         });
       }
     });
@@ -117,38 +246,96 @@ export async function getPropertyDetails(url: string): Promise<PropertyDetails> 
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    const title = $("h1, .detail-title").first().text().trim();
-    const price = $(".price, .cena, .detail-price").first().text().trim();
-    const location = $(".location, .locality, .lokace").first().text().trim();
-    const fullDescription = $(".description, .popis, .detail-description").text().trim();
-    const imageUrl = $("img.main-image, .gallery img").first().attr("src");
+    // Title and number
+    const titleEl = $("h1.title");
+    const title = titleEl.clone().children().remove().end().text().trim();
+    const number = titleEl.find(".number").text().trim();
 
-    const features: string[] = [];
-    $(".features li, .parametry li, .vybaveni li").each((_, el) => {
-      const feature = $(el).text().trim();
-      if (feature) features.push(feature);
+    // Price
+    const priceValue = $(".price .t2").first().text().trim();
+    const priceUnit = $(".price .t1").first().text().trim();
+    const price = priceValue ? `${priceValue} ${priceUnit}`.trim() : "Cena není uvedena";
+
+    // Location
+    const locationParts: string[] = [];
+    $("meta[property='og:description']").each((_, el) => {
+      const content = $(el).attr("content");
+      if (content) {
+        const match = content.match(/ubytování ([^⭐]*)/);
+        if (match) locationParts.push(match[1].trim());
+      }
+    });
+    const location = locationParts.join(", ") || "Lokalita není uvedena";
+
+    // Rating
+    const rating = $(".simple-rating").first().text().trim();
+
+    // Tags (includes capacity and bedrooms)
+    const tags: string[] = [];
+    let capacity: number | undefined;
+    let bedrooms: number | undefined;
+
+    $(".tag.tag-sm").each((_, el) => {
+      const tag = $(el).text().trim();
+      tags.push(tag);
+
+      // Parse capacity
+      const capacityMatch = tag.match(/(\d+)\s+osob/);
+      if (capacityMatch) {
+        capacity = parseInt(capacityMatch[1]);
+      }
+
+      // Parse bedrooms
+      const bedroomsMatch = tag.match(/(\d+)\s+ložnic/);
+      if (bedroomsMatch) {
+        bedrooms = parseInt(bedroomsMatch[1]);
+      }
     });
 
-    const specifications: Record<string, string> = {};
-    $(".specifications tr, .parametry-table tr").each((_, el) => {
-      const key = $(el).find("th, td:first-child").text().trim();
-      const value = $(el).find("td:last-child").text().trim();
-      if (key && value) specifications[key] = value;
+    // Equipment grouped by category
+    const equipment: Record<string, string[]> = {};
+    $(".equipment-group").each((_, el) => {
+      const $group = $(el);
+      const category = $group.find("h3.title").text().trim();
+      const items: string[] = [];
+      
+      $group.find("li").each((_, li) => {
+        const item = $(li).text().trim();
+        if (item) items.push(item);
+      });
+
+      if (category && items.length > 0) {
+        equipment[category] = items;
+      }
     });
 
-    const contact = $(".contact, .kontakt").first().text().trim();
+    // Description from equipment section
+    const fullDescription = $("#vybaveni .desc").text().trim() || 
+                           $(".desc.default-style").first().text().trim() ||
+                           "";
+
+    // All features combined
+    const features = tags.concat(
+      ...Object.values(equipment).flat()
+    );
+
+    // Image
+    const imageUrl = $(".images img").first().attr("src");
 
     return {
-      title,
-      price: price || "Cena není uvedena",
-      location: location || "Lokalita není uvedena",
-      description: fullDescription.substring(0, 200) + "...",
+      title: `${title} ${number}`.trim(),
+      price,
+      location,
+      description: fullDescription.substring(0, 200) + (fullDescription.length > 200 ? "..." : ""),
       fullDescription,
       url,
       imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `https://www.e-chalupy.cz${imageUrl}`) : undefined,
+      rating: rating || undefined,
       features,
-      specifications,
-      contact: contact || undefined,
+      capacity,
+      bedrooms,
+      tags,
+      equipment,
     };
   } catch (error) {
     throw new Error(`Chyba při načítání detailu: ${error instanceof Error ? error.message : String(error)}`);
