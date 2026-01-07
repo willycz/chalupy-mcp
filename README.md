@@ -25,6 +25,8 @@ npm install
 npm run build
 ```
 
+Tím se vytvoří složka `dist/` s JavaScript soubory.
+
 ## 🔧 Konfigurace s Claude Desktop
 
 ### Umístění konfiguračního souboru
@@ -47,6 +49,9 @@ npm run build
 ### Přidejte do `claude_desktop_config.json`:
 
 **Varianta 1: Lokální cesta (funguje hned)**
+
+⚠️ **Nejdříve musíte spustit `npm run build`**, který vytvoří složku `dist/` s JavaScript soubory.
+
 ```json
 {
   "mcpServers": {
@@ -58,7 +63,9 @@ npm run build
 }
 ```
 
-⚠️ **Důležité:** Nahraďte `/absolutní/cesta/k/` skutečnou cestou k projektu.
+⚠️ **Důležité:** 
+- Nahraďte `/absolutní/cesta/k/` skutečnou cestou k projektu
+- Soubor `dist/index.js` vznikne až po `npm run build`
 
 **Varianta 2: NPX (vyžaduje publikování na npm)**
 
