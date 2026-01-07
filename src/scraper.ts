@@ -28,7 +28,7 @@ export interface PropertyDetails extends PropertyListing {
 
 export async function searchChalupy(params: SearchParams): Promise<PropertyListing[]> {
   const baseUrl = "https://www.e-chalupy.cz";
-  let searchUrl = `${baseUrl}/chalupy`;
+  let searchUrl = `${baseUrl}/chaty-chalupy`;
 
   const queryParams: string[] = [];
   if (params.region) {
@@ -62,22 +62,23 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
     const listings: PropertyListing[] = [];
     const maxResults = params.maxResults || 10;
 
-    $(".inzerat, .property-item, .listing-item, article").each((i, element) => {
+    $(".item.c-property").each((i, element) => {
       if (i >= maxResults) return false;
 
       const $el = $(element);
-      const title = $el.find("h2, h3, .title, .property-title").first().text().trim();
-      const price = $el.find(".price, .cena, .property-price").first().text().trim();
-      const location = $el.find(".location, .locality, .lokace").first().text().trim();
-      const description = $el.find(".description, .popis, p").first().text().trim();
-      const link = $el.find("a").first().attr("href");
+      const title = $el.find("h3").first().text().trim();
+      const price = $el.find(".price").first().text().trim();
+      const location = $el.find(".location").first().text().trim();
+      const region = $el.find(".location2").first().text().trim();
+      const description = $el.find(".desc").first().text().trim();
+      const link = $el.find("a.images-link").first().attr("href");
       const imageUrl = $el.find("img").first().attr("src");
 
       if (title && link) {
         listings.push({
           title,
           price: price || "Cena není uvedena",
-          location: location || "Lokalita není uvedena",
+          location: location ? `${location}${region ? ' - ' + region : ''}` : "Lokalita není uvedena",
           description: description || "",
           url: link.startsWith("http") ? link : `${baseUrl}${link}`,
           imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `${baseUrl}${imageUrl}`) : undefined,
