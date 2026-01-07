@@ -46,6 +46,34 @@ npm run build
 
 ### Přidejte do `claude_desktop_config.json`:
 
+**Varianta 1: NPX (doporučeno - automatická instalace)**
+```json
+{
+  "mcpServers": {
+    "chalupy": {
+      "command": "npx",
+      "args": ["-y", "chalupy-mcp"]
+    }
+  }
+}
+```
+
+**Varianta 2: Globální instalace**
+```bash
+npm install -g chalupy-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "chalupy": {
+      "command": "chalupy-mcp"
+    }
+  }
+}
+```
+
+**Varianta 3: Lokální cesta**
 ```json
 {
   "mcpServers": {
@@ -56,8 +84,6 @@ npm run build
   }
 }
 ```
-
-⚠️ **Důležité:** Nahraďte `/absolutní/cesta/k/` skutečnou cestou k projektu.
 
 ### Restartujte Claude Desktop
 
