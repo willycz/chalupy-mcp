@@ -8,6 +8,82 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { searchChalupy, getPropertyDetails, listRegions, listFeatures } from "./scraper.js";
 
+// Type guard functions for input validation
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && !isNaN(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(item => typeof item === "string");
+}
+
+function getStringArg(args: Record<string, unknown>, key: string): string | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) return undefined;
+  if (!isString(value)) {
+    throw new Error(`Parametr '${key}' musí být řetězec`);
+  }
+  return value;
+}
+
+function getNumberArg(args: Record<string, unknown>, key: string): number | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) return undefined;
+  if (!isNumber(value)) {
+    throw new Error(`Parametr '${key}' musí být číslo`);
+  }
+  return value;
+}
+
+function getStringArrayArg(args: Record<string, unknown>, key: string): string[] | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) return undefined;
+  if (!isStringArray(value)) {
+    throw new Error(`Parametr '${key}' musí být pole řetězců`);
+  }
+  return value;
+}
+
+function getRequiredStringArg(args: Record<string, unknown>, key: string): string {
+  const value = getStringArg(args, key);
+  if (value === undefined) {
+    throw new Error(`Parametr '${key}' je povinný`);
+  }
+  return value;
+}
+
+/**
+ * Sanitizes error messages to avoid leaking sensitive information
+ */
+function sanitizeErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    // Only return known safe error messages
+    const safePatterns = [
+      /^Neplatná URL/,
+      /^URL musí/,
+      /^Neplatný/,
+      /^Chyba při/,
+      /^Parametr/,
+      /^HTTP error/,
+      /^Požadavek vypršel/,
+      /^maxResults/,
+    ];
+    
+    if (safePatterns.some(pattern => pattern.test(error.message))) {
+      return error.message;
+    }
+    
+    // For unexpected errors, return a generic message
+    console.error("Internal error:", error.message);
+    return "Došlo k neočekávané chybě při zpracování požadavku";
+  }
+  return "Neznámá chyba";
+}
+
 const server = new Server(
   {
     name: "chalupy-mcp",
@@ -111,6 +187,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     throw new Error("Chybí parametry");
   }
 
+  const typedArgs = args as Record<string, unknown>;
+
   try {
     if (name === "list_regions") {
       const regions = await listRegions();
@@ -134,15 +212,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     } else if (name === "search_chalupy") {
       const results = await searchChalupy({
-        query: args.query as string,
-        region: args.region as string,
-        features: args.features as string[],
-        persons: args.persons as number,
-        dateFrom: args.dateFrom as string,
-        dateTo: args.dateTo as string,
-        priceMin: args.priceMin as number,
-        priceMax: args.priceMax as number,
-        maxResults: (args.maxResults as number) || 10,
+        query: getStringArg(typedArgs, "query"),
+        region: getStringArg(typedArgs, "region"),
+        features: getStringArrayArg(typedArgs, "features"),
+        persons: getNumberArg(typedArgs, "persons"),
+        dateFrom: getStringArg(typedArgs, "dateFrom"),
+        dateTo: getStringArg(typedArgs, "dateTo"),
+        priceMin: getNumberArg(typedArgs, "priceMin"),
+        priceMax: getNumberArg(typedArgs, "priceMax"),
+        maxResults: getNumberArg(typedArgs, "maxResults") || 10,
       });
 
       return {
@@ -154,7 +232,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
     } else if (name === "get_property_details") {
-      const details = await getPropertyDetails(args.url as string);
+      const url = getRequiredStringArg(typedArgs, "url");
+      const details = await getPropertyDetails(url);
 
       return {
         content: [
@@ -172,7 +251,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: "text",
-          text: `Chyba: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Chyba: ${sanitizeErrorMessage(error)}`,
         },
       ],
       isError: true,

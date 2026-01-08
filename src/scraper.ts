@@ -1,5 +1,11 @@
-import fetch from "node-fetch";
+import fetch, { Response as FetchResponse } from "node-fetch";
 import * as cheerio from "cheerio";
+
+// Configuration constants
+const BASE_URL = "https://www.e-chalupy.cz";
+const ALLOWED_HOSTNAME = "www.e-chalupy.cz";
+const FETCH_TIMEOUT_MS = 30000;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export interface SearchParams {
   query?: string;
@@ -44,8 +50,95 @@ export interface Feature {
   count: number;
 }
 
-const REGIONS_CACHE: Region[] = [];
-const FEATURES_CACHE: Feature[] = [];
+// Cache with TTL support
+interface CacheEntry<T> {
+  data: T[];
+  timestamp: number;
+}
+
+class Cache<T> {
+  private entry: CacheEntry<T> | null = null;
+
+  get(): T[] | null {
+    if (!this.entry) return null;
+    if (Date.now() - this.entry.timestamp > CACHE_TTL_MS) {
+      this.entry = null;
+      return null;
+    }
+    return this.entry.data;
+  }
+
+  set(data: T[]): void {
+    this.entry = { data, timestamp: Date.now() };
+  }
+
+  clear(): void {
+    this.entry = null;
+  }
+}
+
+const regionsCache = new Cache<Region>();
+const featuresCache = new Cache<Feature>();
+
+// Valid slug pattern: lowercase letters, numbers, and hyphens only
+const VALID_SLUG_PATTERN = /^[a-z0-9-]+$/;
+
+/**
+ * Validates that a URL belongs to the allowed domain (prevents SSRF)
+ */
+function validateUrl(url: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Neplatná URL adresa");
+  }
+
+  if (parsed.hostname !== ALLOWED_HOSTNAME) {
+    throw new Error(`URL musí být z domény ${ALLOWED_HOSTNAME}`);
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error("URL musí používat HTTPS protokol");
+  }
+
+  return parsed;
+}
+
+/**
+ * Validates a slug parameter (region or feature)
+ */
+function validateSlug(slug: string, type: string): void {
+  if (!VALID_SLUG_PATTERN.test(slug)) {
+    throw new Error(`Neplatný ${type}: ${slug}`);
+  }
+  if (slug.length > 50) {
+    throw new Error(`${type} je příliš dlouhý`);
+  }
+}
+
+/**
+ * Validates date format (YYYY-MM-DD)
+ */
+function validateDate(date: string): void {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(date)) {
+    throw new Error(`Neplatný formát data: ${date}. Použijte formát YYYY-MM-DD`);
+  }
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) {
+    throw new Error(`Neplatné datum: ${date}`);
+  }
+}
+
+/**
+ * Validates numeric parameters
+ */
+function validatePositiveNumber(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${name} musí být kladné číslo`);
+  }
+}
 
 // Random delay to avoid rate limiting
 async function randomDelay(min: number = 500, max: number = 1500): Promise<void> {
@@ -65,9 +158,12 @@ function getRandomUserAgent(): string {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
-// Fetch with retry logic
-async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
+// Fetch with retry logic and timeout
+async function fetchWithRetry(url: string, retries: number = 2): Promise<FetchResponse> {
   for (let i = 0; i <= retries; i++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
     try {
       if (i > 0) {
         await randomDelay(1000, 3000); // Longer delay on retry
@@ -83,7 +179,10 @@ async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
           "Connection": "keep-alive",
           "Upgrade-Insecure-Requests": "1",
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         if (response.status === 500 && i < retries) {
@@ -95,19 +194,25 @@ async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
 
       return response;
     } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("Požadavek vypršel - server neodpověděl včas");
+      }
       if (i === retries) throw error;
       console.error(`Request failed, retrying... (attempt ${i + 1}/${retries})`);
     }
   }
+  throw new Error("Nepodařilo se načíst data po opakovaných pokusech");
 }
 
 export async function listRegions(): Promise<Region[]> {
-  if (REGIONS_CACHE.length > 0) {
-    return REGIONS_CACHE;
+  const cached = regionsCache.get();
+  if (cached) {
+    return cached;
   }
 
   try {
-    const response = await fetchWithRetry("https://www.e-chalupy.cz/chaty-chalupy");
+    const response = await fetchWithRetry(`${BASE_URL}/chaty-chalupy`);
 
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -120,6 +225,8 @@ export async function listRegions(): Promise<Region[]> {
       "vysocina", "zapadni-cechy"
     ];
 
+    const regions: Region[] = [];
+
     $('a[href^="/"]').each((_, el) => {
       const href = $(el).attr("href");
       const name = $(el).find(".t").text().trim();
@@ -128,25 +235,27 @@ export async function listRegions(): Promise<Region[]> {
 
       if (href && name && count > 0 && czechRegions.includes(href.substring(1))) {
         const slug = href.substring(1);
-        if (!REGIONS_CACHE.find(r => r.slug === slug)) {
-          REGIONS_CACHE.push({ slug, name, count });
+        if (!regions.find(r => r.slug === slug)) {
+          regions.push({ slug, name, count });
         }
       }
     });
 
-    return REGIONS_CACHE;
+    regionsCache.set(regions);
+    return regions;
   } catch (error) {
-    throw new Error(`Chyba při načítání regionů: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Chyba při načítání regionů: ${error instanceof Error ? error.message : "Neznámá chyba"}`);
   }
 }
 
 export async function listFeatures(): Promise<Feature[]> {
-  if (FEATURES_CACHE.length > 0) {
-    return FEATURES_CACHE;
+  const cached = featuresCache.get();
+  if (cached) {
+    return cached;
   }
 
   try {
-    const response = await fetchWithRetry("https://www.e-chalupy.cz/chaty-chalupy");
+    const response = await fetchWithRetry(`${BASE_URL}/chaty-chalupy`);
 
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -159,6 +268,8 @@ export async function listFeatures(): Promise<Feature[]> {
       "pro-rybare", "nekuracky", "bezbarierovy", "pro-cyklisty", "u-sjezdovky"
     ];
 
+    const features: Feature[] = [];
+
     $('a[href^="/"]').each((_, el) => {
       const href = $(el).attr("href");
       const name = $(el).find(".t").text().trim();
@@ -167,51 +278,81 @@ export async function listFeatures(): Promise<Feature[]> {
 
       if (href && name && count > 0 && featureSlugs.includes(href.substring(1))) {
         const slug = href.substring(1);
-        if (!FEATURES_CACHE.find(f => f.slug === slug)) {
-          FEATURES_CACHE.push({ slug, name, count });
+        if (!features.find(f => f.slug === slug)) {
+          features.push({ slug, name, count });
         }
       }
     });
 
-    return FEATURES_CACHE;
+    featuresCache.set(features);
+    return features;
   } catch (error) {
-    throw new Error(`Chyba při načítání vlastností: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Chyba při načítání vlastností: ${error instanceof Error ? error.message : "Neznámá chyba"}`);
   }
 }
 
 export async function searchChalupy(params: SearchParams): Promise<PropertyListing[]> {
-  const baseUrl = "https://www.e-chalupy.cz";
-  
+  // Validate input parameters
+  if (params.region) {
+    validateSlug(params.region, "region");
+  }
+  if (params.features) {
+    for (const feature of params.features) {
+      validateSlug(feature, "feature");
+    }
+  }
+  if (params.dateFrom) {
+    validateDate(params.dateFrom);
+  }
+  if (params.dateTo) {
+    validateDate(params.dateTo);
+  }
+  if (params.persons !== undefined) {
+    validatePositiveNumber(params.persons, "persons");
+  }
+  if (params.priceMin !== undefined) {
+    validatePositiveNumber(params.priceMin, "priceMin");
+  }
+  if (params.priceMax !== undefined) {
+    validatePositiveNumber(params.priceMax, "priceMax");
+  }
+  if (params.maxResults !== undefined) {
+    validatePositiveNumber(params.maxResults, "maxResults");
+    if (params.maxResults > 100) {
+      throw new Error("maxResults nemůže být větší než 100");
+    }
+  }
+
   // Build URL path
   let searchPath = "/chaty-chalupy";
   
   if (params.region) {
-    searchPath = `/${params.region}`;
+    searchPath = `/${encodeURIComponent(params.region)}`;
     if (params.features && params.features.length > 0) {
-      searchPath += `/${params.features[0]}`;
+      searchPath += `/${encodeURIComponent(params.features[0])}`;
     }
   } else if (params.features && params.features.length > 0) {
-    searchPath = `/${params.features[0]}`;
+    searchPath = `/${encodeURIComponent(params.features[0])}`;
   }
 
-  let searchUrl = `${baseUrl}${searchPath}`;
+  let searchUrl = `${BASE_URL}${searchPath}`;
 
   // Build query parameters
   const queryParams: string[] = [];
   if (params.persons) {
-    queryParams.push(`osoby=${params.persons}`);
+    queryParams.push(`osoby=${encodeURIComponent(params.persons)}`);
   }
   if (params.dateFrom) {
-    queryParams.push(`od=${params.dateFrom}`);
+    queryParams.push(`od=${encodeURIComponent(params.dateFrom)}`);
   }
   if (params.dateTo) {
-    queryParams.push(`do=${params.dateTo}`);
+    queryParams.push(`do=${encodeURIComponent(params.dateTo)}`);
   }
   if (params.priceMin) {
-    queryParams.push(`cenaMin=${params.priceMin}`);
+    queryParams.push(`cenaMin=${encodeURIComponent(params.priceMin)}`);
   }
   if (params.priceMax) {
-    queryParams.push(`cenaMax=${params.priceMax}`);
+    queryParams.push(`cenaMax=${encodeURIComponent(params.priceMax)}`);
   }
 
   if (queryParams.length > 0) {
@@ -247,8 +388,8 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
           price: price || "Cena není uvedena",
           location: location ? `${location}${region ? ' - ' + region : ''}` : "Lokalita není uvedena",
           description: description || "",
-          url: link.startsWith("http") ? link : `${baseUrl}${link}`,
-          imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `${baseUrl}${imageUrl}`) : undefined,
+          url: link.startsWith("http") ? link : `${BASE_URL}${link}`,
+          imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `${BASE_URL}${imageUrl}`) : undefined,
           rating: rating || undefined,
         });
       }
@@ -266,11 +407,14 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
 
     return listings;
   } catch (error) {
-    throw new Error(`Chyba při vyhledávání: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Chyba při vyhledávání: ${error instanceof Error ? error.message : "Neznámá chyba"}`);
   }
 }
 
 export async function getPropertyDetails(url: string): Promise<PropertyDetails> {
+  // Validate URL to prevent SSRF attacks
+  validateUrl(url);
+
   try {
     await randomDelay(); // Add delay before detail request
     const response = await fetchWithRetry(url);
@@ -361,7 +505,7 @@ export async function getPropertyDetails(url: string): Promise<PropertyDetails> 
       description: fullDescription.substring(0, 200) + (fullDescription.length > 200 ? "..." : ""),
       fullDescription,
       url,
-      imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `https://www.e-chalupy.cz${imageUrl}`) : undefined,
+      imageUrl: imageUrl ? (imageUrl.startsWith("http") ? imageUrl : `${BASE_URL}${imageUrl}`) : undefined,
       rating: rating || undefined,
       features,
       capacity,
@@ -370,6 +514,6 @@ export async function getPropertyDetails(url: string): Promise<PropertyDetails> 
       equipment,
     };
   } catch (error) {
-    throw new Error(`Chyba při načítání detailu: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Chyba při načítání detailu: ${error instanceof Error ? error.message : "Neznámá chyba"}`);
   }
 }
