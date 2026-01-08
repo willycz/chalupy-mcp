@@ -41,46 +41,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "search_chalupy",
-        description: "Vyhledá pronájmy chalup a chat na e-chalupy.cz podle zadaných kritérií",
+        description: "Vyhledá pronájmy chalup a chat na e-chalupy.cz podle zadaných kritérií. Všechny parametry jsou volitelné a lze je libovolně kombinovat.",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Textové vyhledávání v názvech a popisech",
+              description: "Volitelné textové vyhledávání v názvech a popisech objektů",
             },
             region: {
               type: "string",
-              description: "Slug regionu (např. 'vysocina', 'krkonose', 'sumava'). Použij list_regions pro výpis všech.",
+              description: "Volitelný slug regionu pro filtrování podle oblasti (např. 'vysocina', 'krkonose', 'sumava'). Použij list_regions pro výpis všech dostupných regionů.",
             },
             features: {
               type: "array",
               items: { type: "string" },
-              description: "Pole slugů vlastností (např. ['bazen-venkovni', 'se-saunou']). Použij list_features pro výpis všech.",
+              description: "Volitelné pole slugů vlastností pro filtrování podle vybavení (např. ['bazen-venkovni', 'se-saunou']). Použij list_features pro výpis všech dostupných vlastností.",
             },
             persons: {
               type: "number",
-              description: "Počet osob (minimální kapacita objektu)",
+              description: "Volitelný počet osob - filtruje objekty s minimální kapacitou pro tento počet osob",
             },
             dateFrom: {
               type: "string",
-              description: "Datum od (YYYY-MM-DD)",
+              description: "Volitelné datum začátku pobytu ve formátu YYYY-MM-DD (např. '2026-07-11'). Filtruje dostupnost objektů od tohoto data.",
             },
             dateTo: {
               type: "string",
-              description: "Datum do (YYYY-MM-DD)",
+              description: "Volitelné datum konce pobytu ve formátu YYYY-MM-DD (např. '2026-07-18'). Filtruje dostupnost objektů do tohoto data.",
             },
             priceMin: {
               type: "number",
-              description: "Minimální cena v Kč",
+              description: "Volitelná minimální cena v Kč pro filtrování podle cenového rozmezí",
             },
             priceMax: {
               type: "number",
-              description: "Maximální cena v Kč",
+              description: "Volitelná maximální cena v Kč pro filtrování podle cenového rozmezí",
             },
             maxResults: {
               type: "number",
-              description: "Maximální počet výsledků (výchozí 10)",
+              description: "Volitelný maximální počet vrácených výsledků (výchozí hodnota je 10)",
               default: 10,
             },
           },

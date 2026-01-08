@@ -165,14 +165,20 @@ Vrátí seznam všech dostupných vlastností a vybavení pro filtrování.
 
 ### `search_chalupy`
 
-Parametry:
-- `query` (string, optional) - Textové vyhledávání v názvech a popisech
-- `region` (string, optional) - Slug regionu (např. "vysocina", "krkonose")
-- `features` (array, optional) - Pole slugů vlastností (např. ["bazen-venkovni", "se-saunou"])
-- `persons` (number, optional) - Minimální počet osob (kapacita objektu)
-- `dateFrom` (string, optional) - Datum od (YYYY-MM-DD)
-- `dateTo` (string, optional) - Datum do (YYYY-MM-DD)
+Vyhledá pronájmy podle zadaných kritérií. **Všechny parametry jsou volitelné** a lze je libovolně kombinovat.
+
+**Parametry:**
+- `query` (string, optional) - Textové vyhledávání v názvech a popisech objektů
+- `region` (string, optional) - Slug regionu (např. "vysocina", "krkonose"). Použij `list_regions` pro výpis všech.
+- `features` (array, optional) - Pole slugů vlastností (např. ["bazen-venkovni", "se-saunou"]). Použij `list_features` pro výpis všech.
+- `persons` (number, optional) - Minimální kapacita objektu (počet osob)
+- `dateFrom` (string, optional) - Datum začátku pobytu ve formátu YYYY-MM-DD (např. "2026-07-11")
+- `dateTo` (string, optional) - Datum konce pobytu ve formátu YYYY-MM-DD (např. "2026-07-18")
+- `priceMin` (number, optional) - Minimální cena v Kč
+- `priceMax` (number, optional) - Maximální cena v Kč
 - `maxResults` (number, optional) - Max. počet výsledků (výchozí: 10)
+
+**⚠️ Důležité:** Parametry `dateFrom` a `dateTo` se posílají jako samostatné parametry, **ne** jako část textového `query`!
 
 **Příklad výstupu:**
 ```json
@@ -187,6 +193,25 @@ Parametry:
     "rating": "4.7"
   }
 ]
+```
+
+**Příklady volání:**
+```javascript
+// Hledání s termínem
+{
+  "region": "krkonose",
+  "persons": 8,
+  "dateFrom": "2026-07-15",
+  "dateTo": "2026-07-22",
+  "priceMax": 6000
+}
+
+// Hledání s vybavením
+{
+  "region": "jeseniky",
+  "features": ["s-virivkou", "se-saunou"],
+  "persons": 12
+}
 ```
 
 ### `get_property_details`
