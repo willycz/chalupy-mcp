@@ -47,21 +47,67 @@ export interface Feature {
 const REGIONS_CACHE: Region[] = [];
 const FEATURES_CACHE: Feature[] = [];
 
+// Random delay to avoid rate limiting
+async function randomDelay(min: number = 500, max: number = 1500): Promise<void> {
+  const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+// Rotate user agents to appear more natural
+function getRandomUserAgent(): string {
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  ];
+  return userAgents[Math.floor(Math.random() * userAgents.length)];
+}
+
+// Fetch with retry logic
+async function fetchWithRetry(url: string, retries: number = 2): Promise<any> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      if (i > 0) {
+        await randomDelay(1000, 3000); // Longer delay on retry
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": getRandomUserAgent(),
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": "cs,en-US;q=0.7,en;q=0.3",
+          "Accept-Encoding": "gzip, deflate, br",
+          "DNT": "1",
+          "Connection": "keep-alive",
+          "Upgrade-Insecure-Requests": "1",
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 500 && i < retries) {
+          console.error(`Server returned 500, retrying... (attempt ${i + 1}/${retries})`);
+          continue;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response;
+    } catch (error) {
+      if (i === retries) throw error;
+      console.error(`Request failed, retrying... (attempt ${i + 1}/${retries})`);
+    }
+  }
+}
+
 export async function listRegions(): Promise<Region[]> {
   if (REGIONS_CACHE.length > 0) {
     return REGIONS_CACHE;
   }
 
   try {
-    const response = await fetch("https://www.e-chalupy.cz/chaty-chalupy", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    const response = await fetchWithRetry("https://www.e-chalupy.cz/chaty-chalupy");
 
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -100,15 +146,7 @@ export async function listFeatures(): Promise<Feature[]> {
   }
 
   try {
-    const response = await fetch("https://www.e-chalupy.cz/chaty-chalupy", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    const response = await fetchWithRetry("https://www.e-chalupy.cz/chaty-chalupy");
 
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -181,15 +219,8 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
   }
 
   try {
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await randomDelay(); // Add delay before search request
+    const response = await fetchWithRetry(searchUrl);
 
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -241,15 +272,8 @@ export async function searchChalupy(params: SearchParams): Promise<PropertyListi
 
 export async function getPropertyDetails(url: string): Promise<PropertyDetails> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    await randomDelay(); // Add delay before detail request
+    const response = await fetchWithRetry(url);
 
     const html = await response.text();
     const $ = cheerio.load(html);
